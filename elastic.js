@@ -15,9 +15,8 @@ const client = new Client({
 });
 
 const INDEX_NAME = process.env.ELASTIC_INDEX;
- // CLIP ViT base patch32
+// CLIP ViT base patch32
 const DIMENSIONS = parseInt(process.env.ELASTIC_DIMESION);
-
 
 // Create index with dense_vector if it doesn't exist
 const createIndexIfNeeded = async () => {
@@ -96,7 +95,6 @@ const searchImage = async (imagePath) => {
       query_vector: vector,
       k: 5,
       num_candidates: 50,
-      boost: 100,
     },
     _source: ["filename", "uploaded_at"],
   });
@@ -108,28 +106,30 @@ const searchImage = async (imagePath) => {
   }
 
   console.log("🎯 Top matches:");
-  await Promise.all(hits.map(async (hit, i) => {
+  await Promise.all(
+    hits.map(async (hit, i) => {
       const { filename, uploaded_at } = hit._source;
       console.log(`${i + 1}. ${filename} (score: ${hit._score.toFixed(4)}) - uploaded at ${uploaded_at}`);
-    }));
-  
-    const result = hits.map((hit, i) => ({
-      rank: i + 1,
-      filename: hit._source.filename,
-      score: hit._score.toFixed(4),
-      uploaded_at: hit._source.uploaded_at,
-    }));
-  
-    const outputPath = path.resolve("search_results.json");
-    await fs.writeFile(outputPath, JSON.stringify(result, null, 2));
-    console.log(`✅ Search results saved to ${outputPath}`);
+    })
+  );
 
-    const searchImageOutputPath = path.resolve("search_image.json");
-    const searchImageData = {
-      search_image: path.basename(imagePath),
-    };
-    await fs.writeFile(searchImageOutputPath, JSON.stringify(searchImageData, null, 2));
-    console.log(`✅ Search image details saved to ${searchImageOutputPath}`);
+  const result = hits.map((hit, i) => ({
+    rank: i + 1,
+    filename: hit._source.filename,
+    score: hit._score.toFixed(4),
+    uploaded_at: hit._source.uploaded_at,
+  }));
+
+  const outputPath = path.resolve("search_results.json");
+  await fs.writeFile(outputPath, JSON.stringify(result, null, 2));
+  console.log(`✅ Search results saved to ${outputPath}`);
+
+  const searchImageOutputPath = path.resolve("search_image.json");
+  const searchImageData = {
+    search_image: path.basename(imagePath),
+  };
+  await fs.writeFile(searchImageOutputPath, JSON.stringify(searchImageData, null, 2));
+  console.log(`✅ Search image details saved to ${searchImageOutputPath}`);
 };
 
 // Delete all images from index

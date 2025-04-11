@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Search Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #4a6cf7;
+      --secondary-color: #6c757d;
+      --background-color: #f8f9fa;
+      --card-color: #ffffff;
+      --border-radius: 12px;
+      --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--background-color);
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding: 20px 0;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    
+    .subtitle {
+      color: var(--secondary-color);
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+    
+    .search-image-container {
+      background-color: var(--card-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      padding: 30px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    
+    .search-image-title {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .search-image-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .search-image {
+      max-width: 400px;
+      max-height: 400px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      object-fit: contain;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+    
+    .search-image:hover {
+      transform: scale(1.02);
+    }
+    
+    .search-image-info {
+      font-size: 1rem;
+      color: var(--secondary-color);
+      margin-top: 10px;
+    }
+    
+    .results-container {
+      background-color: var(--card-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      padding: 30px;
+      margin-bottom: 40px;
+    }
+    
+    .results-title {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #333;
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 25px;
+    }
+    
+    .result-card {
+      background-color: #fff;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .result-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .result-image-container {
+      height: 200px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+    
+    .result-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+    
+    .result-card:hover .result-image {
+      transform: scale(1.05);
+    }
+    
+    .result-rank {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: var(--primary-color);
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .result-score {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    
+    .result-info {
+      padding: 15px;
+    }
+    
+    .result-filename {
+      font-weight: 600;
+      margin-bottom: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .result-date {
+      font-size: 0.85rem;
+      color: var(--secondary-color);
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.2rem;
+      color: var(--secondary-color);
+    }
+    
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #dc3545;
+      font-size: 1.2rem;
+    }
+    
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.9);
+      overflow: auto;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal-content {
+      position: relative;
+      max-width: 90%;
+      max-height: 90%;
+      margin: auto;
+      display: block;
+    }
+    
+    .modal-image {
+      width: 100%;
+      height: auto;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    
+    .modal-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 15px;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+    
+    .modal-filename {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .modal-score {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .close-modal {
+      position: absolute;
+      top: 15px;
+      right: 25px;
+      color: white;
+      font-size: 30px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 1001;
+    }
+    
+    .close-modal:hover {
+      color: var(--primary-color);
+    }
+    
+    @media (max-width: 768px) {
+      .results-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .search-image {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Image Search Results</h1>
+      <p class="subtitle">Visual similarity search using CLIP embeddings</p>
+    </header>
+    
+    <!-- Search Image Section -->
+    <div class="search-image-container">
+      <h2 class="search-image-title">Search Image</h2>
+      <div class="search-image-wrapper">
+        <img id="search-image" class="search-image" alt="Search Image">
+      </div>
+      <p id="search-image-name" class="search-image-info"></p>
+    </div>
+    
+    <!-- Results Section -->
+    <div class="results-container">
+      <h2 class="results-title">Similar Images</h2>
+      <div id="loading" class="loading">Loading results...</div>
+      <div id="error" class="error" style="display: none;">Error loading results</div>
+      <div id="results-grid" class="results-grid">
+        <!-- Results will be dynamically inserted here -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal for displaying full image -->
+  <div id="image-modal" class="modal">
+    <span class="close-modal">&times;</span>
+    <div class="modal-content">
+      <img id="modal-image" class="modal-image" alt="Full size image">
+      <div class="modal-info">
+        <div id="modal-filename" class="modal-filename"></div>
+        <div id="modal-score" class="modal-score"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Function to format date
+    function formatDate(dateString) {
+      const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+    
+    // Function to get image path
+    function getImagePath(filename) {
+      // Use the photos directory where the images are stored
+      return `./photos/${filename}`;
+    }
+    
+    // Modal functionality
+    const modal = document.getElementById('image-modal');
+    const modalImg = document.getElementById('modal-image');
+    const modalFilename = document.getElementById('modal-filename');
+    const modalScore = document.getElementById('modal-score');
+    const closeBtn = document.querySelector('.close-modal');
+    
+    // Function to open modal with image
+    function openModal(imgSrc, filename, score) {
+      modal.style.display = 'flex';
+      modalImg.src = imgSrc;
+      modalFilename.textContent = filename;
+      modalScore.textContent = `Similarity Score: ${score}%`;
+    }
+    
+    // Close modal when clicking the close button
+    closeBtn.onclick = function() {
+      modal.style.display = 'none';
+    }
+    
+    // Close modal when clicking outside the image
+    modal.onclick = function(event) {
+      if (event.target === modal) {
+        modal.style.display = 'none';
+      }
+    }
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+      }
+    });
+    
+    // Fetch and display the search image details
+    fetch('./search_image.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById('search-image-name').textContent = `Filename: ${data.search_image}`;
+        const imgElement = document.getElementById('search-image');
+        
+        // Always use the getImagePath function to construct the path
+        imgElement.src = getImagePath(data.search_image);
+        imgElement.alt = data.search_image;
+        
+        // Add click event to search image
+        imgElement.onclick = function() {
+          openModal(imgElement.src, data.search_image, '100');
+        };
+      })
+      .catch(error => {
+        console.error('Error loading search image:', error);
+        document.getElementById('search-image').style.display = 'none';
+        document.getElementById('search-image-name').textContent = 'Error loading search image';
+      });
+
+    // Fetch and display the search results
+    fetch('./search_results.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        const resultsGrid = document.getElementById('results-grid');
+        
+        data.forEach(result => {
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          
+          const imagePath = getImagePath(result.filename);
+          
+          card.innerHTML = `
+            <div class="result-image-container">
+              <div class="result-rank">${result.rank}</div>
+              <div class="result-score">${result.score}%</div>
+              <img class="result-image" src="${imagePath}" alt="${result.filename}">
+            </div>
+            <div class="result-info">
+              <div class="result-filename">${result.filename}</div>
+              <div class="result-date">${formatDate(result.uploaded_at)}</div>
+            </div>
+          `;
+          
+          // Add click event to the image container
+          const imageContainer = card.querySelector('.result-image-container');
+          imageContainer.onclick = function() {
+            openModal(imagePath, result.filename, result.score);
+          };
+          
+          resultsGrid.appendChild(card);
+        });
+      })
+      .catch(error => {
+        console.error('Error loading search results:', error);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+      });
+  </script>
+</body>
+</html>

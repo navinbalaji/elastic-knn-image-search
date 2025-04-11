@@ -6,3 +6,7 @@ node_modules
 .DS_Store
 
 photos
+
+search_image.json
+
+search_results.json

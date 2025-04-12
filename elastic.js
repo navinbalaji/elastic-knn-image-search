@@ -93,7 +93,7 @@ const searchImage = async (imagePath) => {
     knn: {
       field: "image_vector",
       query_vector: vector,
-      k: 5,
+      k: 3,
       num_candidates: 50,
     },
     _source: ["filename", "uploaded_at"],

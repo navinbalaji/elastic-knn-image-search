@@ -12,7 +12,7 @@ const run = async () => {
   });
 
   // Load local image - pass the path directly instead of reading the file
-  const imagePath = path.resolve('./photos/apple.webp');
+  const imagePath = path.resolve('./photos/car1.jpeg');
   
   console.log('Encoding image...');
   // Pass the image path directly to the model

@@ -93,7 +93,7 @@ const searchImage = async (imagePath) => {
     knn: {
       field: "image_vector",
       query_vector: vector,
-      k: 3,
+      k: 8,
       num_candidates: 50,
     },
     _source: ["filename", "uploaded_at"],
@@ -127,6 +127,7 @@ const searchImage = async (imagePath) => {
   const searchImageOutputPath = path.resolve("search_image.json");
   const searchImageData = {
     search_image: path.basename(imagePath),
+    path: `./${path.relative(process.cwd(), imagePath)}`,
   };
   await fs.writeFile(searchImageOutputPath, JSON.stringify(searchImageData, null, 2));
   console.log(`✅ Search image details saved to ${searchImageOutputPath}`);

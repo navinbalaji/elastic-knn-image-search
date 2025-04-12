@@ -341,7 +341,9 @@
     // Function to get image path
     function getImagePath(filename) {
       // Use the photos directory where the images are stored
-      return `./photos/${filename}`;
+      // return `./photos/${filename}`;
+
+      return `./testdata/Test/${filename}`;
     }
     
     // Modal functionality
@@ -391,7 +393,7 @@
         const imgElement = document.getElementById('search-image');
         
         // Always use the getImagePath function to construct the path
-        imgElement.src = getImagePath(data.search_image);
+        imgElement.src = data.path;
         imgElement.alt = data.search_image;
         
         // Add click event to search image

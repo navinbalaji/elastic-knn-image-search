@@ -1,13 +1,14 @@
 # Image Search Application
 
-A web application that allows users to upload images and search for similar images using Elasticsearch and CLIP embeddings.
+A web application that allows users to search for similar images using Elasticsearch and CLIP embeddings. This application uses the CLIP vision model to generate embeddings for images and Elasticsearch for efficient similarity search.
 
 ## Features
 
-- Upload images to the database
+- Upload images to Elasticsearch with vector embeddings
 - Search for similar images using a query image
-- View search results with similarity scores
-- Modern and responsive UI
+- View search results with similarity scores in a modern UI
+- Batch upload functionality for multiple images
+- Command-line interface for easy operation
 
 ## Prerequisites
 
@@ -20,7 +21,7 @@ A web application that allows users to upload images and search for similar imag
 1. Clone the repository:
    ```
    git clone <repository-url>
-   cd image-search
+   cd knn
    ```
 
 2. Install dependencies:
@@ -35,49 +36,81 @@ A web application that allows users to upload images and search for similar imag
    ELASTIC_PASSWORD=your-password
    ELASTIC_INDEX=image-search
    ELASTIC_DIMESION=512
-   PORT=3000
+   IMAGE_DIRECTORY=./photos
    ```
-
-4. Start the server:
-   ```
-   npm start
-   ```
-
-5. Open your browser and navigate to `http://localhost:3000`
 
 ## Usage
 
-1. **Upload an Image**:
-   - Click on the "Choose File" button in the Upload Image section
-   - Select an image file
-   - Click the "Upload" button
-   - Wait for the upload to complete
+The application provides a command-line interface for various operations:
 
-2. **Search for Similar Images**:
-   - Click on the "Choose File" button in the Search Similar Images section
-   - Select an image file to use as a query
-   - Click the "Search" button
-   - View the results displayed in the Results section
+### Upload a Single Image
+
+```
+node elastic.js --upload <image_path>
+```
+
+### Search for Similar Images
+
+```
+node elastic.js --search <image_path>
+```
+
+### Upload All Images in a Directory
+
+```
+node elastic.js --upload-all
+```
+
+### Delete All Images from the Index
+
+```
+node elastic.js --delete
+```
+
+### Generate Embeddings for an Image
+
+```
+node clip.js
+```
+
+## Viewing Results
+
+After performing a search, the application generates two JSON files:
+- `search_results.json`: Contains the search results with similarity scores
+- `search_image.json`: Contains information about the query image
+
+You can view the results in a web browser by opening the `index.html` file, which provides a modern and responsive UI for displaying the search results.
 
 ## How It Works
 
-1. When an image is uploaded, the application:
-   - Saves the image to the server
-   - Generates an embedding vector using the CLIP model
-   - Stores the vector and image metadata in Elasticsearch
+1. **Image Embedding Generation**:
+   - The application uses the CLIP vision model to generate embeddings for images
+   - The embeddings are 512-dimensional vectors that capture the visual features of the images
 
-2. When searching for similar images, the application:
-   - Generates an embedding vector for the query image
-   - Searches Elasticsearch for images with similar vectors
-   - Returns and displays the results
+2. **Elasticsearch Integration**:
+   - The embeddings are stored in Elasticsearch using the `dense_vector` field type
+   - Elasticsearch's k-NN search capabilities are used to find similar images
+
+3. **Similarity Search**:
+   - When a query image is provided, its embedding is generated
+   - Elasticsearch finds the k nearest neighbors based on cosine similarity
+   - Results are returned with similarity scores and displayed in the UI
+
+## Project Structure
+
+- `elastic.js`: Main application file for Elasticsearch operations
+- `clip.js`: Utility for generating embeddings using the CLIP model
+- `index.html`: Web interface for displaying search results
+- `photos/`: Directory for storing images
+- `testdata/`: Directory for test images
 
 ## Technologies Used
 
-- **Frontend**: HTML, CSS, JavaScript
-- **Backend**: Node.js, Express
+- **Backend**: Node.js
 - **Database**: Elasticsearch
 - **Image Processing**: CLIP (Contrastive Language-Image Pre-training)
-- **File Upload**: Multer
+- **Frontend**: HTML, CSS, JavaScript
+- **Libraries**: @elastic/elasticsearch, @xenova/transformers
 
 ## License
 

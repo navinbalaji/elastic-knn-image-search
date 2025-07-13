@@ -1,3 +1,9 @@
+---
+title: "Elastic Image Search Application using KNN"
+layout: default
+---
+
+
 # Elastic Image Search Application using KNN
 
 A web application that allows users to search for similar images using Elasticsearch and CLIP embeddings. This application uses the CLIP vision model to generate embeddings for images and Elasticsearch for efficient similarity search.

@@ -85,7 +85,7 @@ After performing a search, the application generates two JSON files:
 - `search_results.json`: Contains the search results with similarity scores
 - `search_image.json`: Contains information about the query image
 
-You can view the results in a web browser by opening the `index.html` file, which provides a modern and responsive UI for displaying the search results.
+You can view the results in a web browser by opening the `output.html` file, which provides a modern and responsive UI for displaying the search results.
 
 ## How It Works
 
@@ -106,7 +106,7 @@ You can view the results in a web browser by opening the `index.html` file, whic
 
 - `elastic.js`: Main application file for Elasticsearch operations
 - `clip.js`: Utility for generating embeddings using the CLIP model
-- `index.html`: Web interface for displaying search results
+- `output.html`: Web interface for displaying search results
 - `photos/`: Directory for storing images
 - `testdata/`: Directory for test images
 

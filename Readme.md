@@ -1,3 +1,9 @@
+---
+title: "Image Search Application"
+layout: default
+---
+
+
 # Image Search Application
 
 A web application that allows users to search for similar images using Elasticsearch and CLIP embeddings. This application uses the CLIP vision model to generate embeddings for images and Elasticsearch for efficient similarity search.

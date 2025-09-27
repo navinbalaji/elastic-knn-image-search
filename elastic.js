@@ -81,8 +81,6 @@ const uploadImage = async (imagePath) => {
   });
 
   console.log(`✅ Image '${filename}' indexed with ID: ${res._id}`);
-    console.log(`✅ Image '${filename}' indexed with ID: ${res._id}`);
-
 };
 
 // Search similar images using query image

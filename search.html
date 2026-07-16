@@ -174,6 +174,33 @@
       outline-color: var(--primary-color);
     }
 
+    .photo-tile.unindexed {
+      cursor: not-allowed;
+    }
+
+    .photo-tile.unindexed img {
+      opacity: 0.35;
+      filter: grayscale(1);
+    }
+
+    .photo-tile .unindexed-badge {
+      display: none;
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background-color: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 20px;
+      z-index: 2;
+    }
+
+    .photo-tile.unindexed .unindexed-badge {
+      display: block;
+    }
+
     .photo-tile.selected::after {
       content: '';
       position: absolute;
@@ -533,16 +560,22 @@
       })
       .then(files => {
         photosStatus.style.display = 'none';
-        files.forEach(filename => {
+        const anyIndexed = files.some(f => f.indexed);
+        if (!anyIndexed && files.length > 0) {
+          photosStatus.style.display = 'block';
+          photosStatus.textContent = 'No images are indexed — run: node elastic.js --upload-all';
+        }
+        files.forEach(({ filename, indexed }) => {
           const tile = document.createElement('div');
-          tile.className = 'photo-tile';
+          tile.className = indexed ? 'photo-tile' : 'photo-tile unindexed';
           tile.innerHTML = `
             <div class="check-badge">&#10003;</div>
+            <div class="unindexed-badge">not indexed</div>
             <img src="${imagePath(filename)}" alt="${filename}" loading="lazy" decoding="async">
             <div class="tile-filename">${filename}</div>
           `;
           attachRetry(tile.querySelector('img'), filename);
-          tile.onclick = () => toggleSelection(filename, tile);
+          if (indexed) tile.onclick = () => toggleSelection(filename, tile);
           photoGrid.appendChild(tile);
         });
       })

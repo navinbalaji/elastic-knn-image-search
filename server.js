@@ -1,5 +1,6 @@
 import express from "express";
 import { Client } from "@elastic/elasticsearch";
+import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
@@ -7,9 +8,12 @@ dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 const INDEX_NAME = process.env.ELASTIC_INDEX;
+const DIMENSIONS = parseInt(process.env.ELASTIC_DIMESION) || 512;
 const PHOTOS_DIR = path.resolve(process.env.IMAGE_DIRECTORY || "./photos");
 const MAX_SELECTION = 5;
+const MAX_BATCH_SIZE = parseInt(process.env.MAX_BATCH_SIZE) || 100;
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const client = new Client({
   node: process.env.ELASTIC_NODE,
@@ -31,18 +35,169 @@ app.get("/output", (req, res) => {
   res.sendFile(path.resolve("output.html"));
 });
 
-// List all images in the photos directory
+// Fetch the set of filenames currently indexed in Elasticsearch
+const getIndexedFilenames = async () => {
+  try {
+    const response = await client.search({
+      index: INDEX_NAME,
+      size: 10000,
+      query: { match_all: {} },
+      _source: ["filename"],
+    });
+    return new Set(response.hits.hits.map((h) => h._source.filename));
+  } catch {
+    // Index missing (e.g. after --delete) or ES down → nothing is indexed
+    return new Set();
+  }
+};
+
+// List all images in the photos directory, flagged with their index status
 app.get("/api/photos", async (req, res) => {
   try {
     const files = await fs.readdir(PHOTOS_DIR);
+    const indexed = await getIndexedFilenames();
     const images = files
       .filter((f) => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()))
-      .sort();
+      .sort()
+      .map((filename) => ({ filename, indexed: indexed.has(filename) }));
     res.json(images);
   } catch (err) {
     console.error("Failed to list photos:", err.message);
     res.status(500).json({ error: "Failed to list photos directory" });
   }
+});
+
+// --- CLIP embedding (model loaded once, lazily) ---
+let extractorPromise = null;
+const getExtractor = () => {
+  if (!extractorPromise) {
+    console.log("Loading CLIP model (first request only)...");
+    // Dynamic import: server starts without the ML dependency; loaded on first ingest
+    extractorPromise = import("@xenova/transformers").then(({ pipeline }) =>
+      pipeline("image-feature-extraction", "Xenova/clip-vit-base-patch32")
+    );
+  }
+  return extractorPromise;
+};
+
+// source can be a local path or an http(s) URL (e.g. S3 presigned URL)
+const embedImage = async (source) => {
+  const extractor = await getExtractor();
+  const embeddings = await extractor(source, { pooling: "mean", normalize: true });
+  return Array.from(embeddings.data);
+};
+
+// Derive a clean filename from a path or URL (strips query string)
+const filenameFromSource = (source) => {
+  try {
+    return path.basename(new URL(source).pathname);
+  } catch {
+    return path.basename(source);
+  }
+};
+
+// --- Index management ---
+const ensureIndex = async () => {
+  const exists = await client.indices.exists({ index: INDEX_NAME });
+  if (!exists) {
+    await client.indices.create({
+      index: INDEX_NAME,
+      body: {
+        mappings: {
+          properties: {
+            image_vector: {
+              type: "dense_vector",
+              dims: DIMENSIONS,
+              index: true,
+              similarity: "cosine",
+            },
+            filename: { type: "keyword" },
+            profile_id: { type: "keyword" },
+            source: { type: "keyword" },
+            uploaded_at: { type: "date" },
+          },
+        },
+      },
+    });
+    console.log("✅ Index created");
+  } else {
+    // Additive mapping update — safe on an existing index
+    await client.indices.putMapping({
+      index: INDEX_NAME,
+      properties: {
+        profile_id: { type: "keyword" },
+        source: { type: "keyword" },
+      },
+    });
+  }
+};
+
+// Ingest a batch of images for a profile
+// Body: { profile_id: "<uuid>", images: ["<path-or-url>", ...] }
+//   or  { profile_id: "<uuid>", images: [{ id: "<uuid>", source: "<path-or-url>" }, ...] }
+app.post("/api/images", async (req, res) => {
+  const { profile_id, images } = req.body;
+
+  if (!profile_id || !UUID_RE.test(profile_id)) {
+    return res.status(400).json({ error: "profile_id must be a valid UUID" });
+  }
+  if (!Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: "images must be a non-empty array" });
+  }
+  if (images.length > MAX_BATCH_SIZE) {
+    return res.status(400).json({ error: `Batch too large (max ${MAX_BATCH_SIZE})` });
+  }
+
+  // Normalize items to { id, source }
+  const items = [];
+  for (const item of images) {
+    const source = typeof item === "string" ? item : item?.source;
+    const id = typeof item === "object" && item?.id ? item.id : randomUUID();
+    if (!source || typeof source !== "string") {
+      return res.status(400).json({ error: "Each image needs a source (path or URL)" });
+    }
+    if (!UUID_RE.test(id)) {
+      return res.status(400).json({ error: `Invalid image id: ${id} (must be a UUID)` });
+    }
+    items.push({ id, source });
+  }
+
+  try {
+    await ensureIndex();
+  } catch (err) {
+    console.error("Index setup failed:", err.message);
+    return res.status(500).json({ error: "Elasticsearch unavailable" });
+  }
+
+  const results = [];
+  for (const { id, source } of items) {
+    try {
+      const vector = await embedImage(source);
+      await client.index({
+        index: INDEX_NAME,
+        id, // image UUID as doc _id → idempotent re-ingestion
+        document: {
+          image_vector: vector,
+          filename: filenameFromSource(source),
+          profile_id,
+          source,
+          uploaded_at: new Date(),
+        },
+      });
+      results.push({ id, source, status: "indexed" });
+    } catch (err) {
+      console.error(`Failed to ingest ${source}:`, err.message);
+      results.push({ id, source, status: "failed", error: err.message });
+    }
+  }
+
+  const indexed = results.filter((r) => r.status === "indexed").length;
+  res.status(results.length === indexed ? 200 : 207).json({
+    profile_id,
+    indexed,
+    failed: results.length - indexed,
+    results,
+  });
 });
 
 // Fetch the stored embedding for a filename from Elasticsearch
@@ -107,7 +262,7 @@ app.post("/api/search", async (req, res) => {
         k: 16 + filenames.length, // headroom for excluded query images + potential duplicate docs
         num_candidates: 100,
       },
-      _source: ["filename", "uploaded_at"],
+      _source: ["filename", "uploaded_at", "profile_id"],
     });
 
     // Exclude query images and dedupe by filename (keeps best-scoring doc)
@@ -125,6 +280,7 @@ app.post("/api/search", async (req, res) => {
         filename: hit._source.filename,
         score: hit._score.toFixed(4),
         uploaded_at: hit._source.uploaded_at,
+        profile_id: hit._source.profile_id ?? null,
       }));
 
     res.json({ results, missing });

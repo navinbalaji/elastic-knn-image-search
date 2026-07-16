@@ -82,6 +82,39 @@ node elastic.js --search photos/<image>.jpg
 
 Prints the top-8 matches and writes `search_results.json` + `search_image.json`. Works with images that aren't indexed (runs CLIP locally on the query image). View the results at http://localhost:3000/output.
 
+## API reference
+
+### `POST /api/images` — batch ingest for a profile
+
+Embeds a batch of images (local paths or URLs, e.g. S3 presigned URLs) and indexes them in ES linked to a profile UUID.
+
+```json
+{
+  "profile_id": "5f0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b",
+  "images": [
+    "photos/car1.jpeg",
+    "https://bucket.s3.amazonaws.com/key.png?X-Amz-Signature=...",
+    { "id": "9b2f...-uuid", "source": "photos/car2.jpeg" }
+  ]
+}
+```
+
+- Each image may be a plain string or `{ id, source }` — `id` (UUID) becomes the ES doc `_id` (idempotent re-ingest); generated if omitted
+- Max 100 images per batch (override with `MAX_BATCH_SIZE` in `.env`); processed sequentially (~0.1–1s per image), so very large batches mean long-running requests — chunk client-side if you need thousands
+- Returns `200` if all indexed, `207` on partial failure:
+
+```json
+{ "profile_id": "...", "indexed": 2, "failed": 1, "results": [ { "id": "...", "source": "...", "status": "indexed" } ] }
+```
+
+First ingest after server start loads the CLIP model (~1–2s warm, ~350MB download on first ever run).
+
+### `POST /api/search` — find similar images
+
+Body: `{ "filenames": ["img1.png", ...] }` (1–5, must be indexed). Returns top-8 ranked matches, each including `profile_id` (null for images ingested before profiles existed).
+
+### `GET /api/photos` — list the local photos directory
+
 ## CLI reference
 
 | Command | Description |

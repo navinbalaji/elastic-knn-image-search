@@ -84,36 +84,122 @@ Prints the top-8 matches and writes `search_results.json` + `search_image.json`.
 
 ## API reference
 
+Base URL: `http://localhost:3000`
+
 ### `POST /api/images` — batch ingest for a profile
 
 Embeds a batch of images (local paths or URLs, e.g. S3 presigned URLs) and indexes them in ES linked to a profile UUID.
 
-```json
-{
-  "profile_id": "5f0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b",
-  "images": [
-    "photos/car1.jpeg",
-    "https://bucket.s3.amazonaws.com/key.png?X-Amz-Signature=...",
-    { "id": "9b2f...-uuid", "source": "photos/car2.jpeg" }
-  ]
-}
+```bash
+curl -X POST http://localhost:3000/api/images \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "profile_id": "5f0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b",
+    "images": [
+      "photos/car1.jpeg",
+      "https://bucket.s3.amazonaws.com/key.png?X-Amz-Signature=...",
+      { "id": "9b2f8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b", "source": "photos/car2.jpeg" }
+    ]
+  }'
 ```
 
-- Each image may be a plain string or `{ id, source }` — `id` (UUID) becomes the ES doc `_id` (idempotent re-ingest); generated if omitted
-- Max 100 images per batch (override with `MAX_BATCH_SIZE` in `.env`); processed sequentially (~0.1–1s per image), so very large batches mean long-running requests — chunk client-side if you need thousands
-- Returns `200` if all indexed, `207` on partial failure:
+Response (`200` all indexed, `207` partial failure):
 
 ```json
 { "profile_id": "...", "indexed": 2, "failed": 1, "results": [ { "id": "...", "source": "...", "status": "indexed" } ] }
 ```
 
-First ingest after server start loads the CLIP model (~1–2s warm, ~350MB download on first ever run).
+- Each image may be a plain string or `{ id, source }` — `id` (UUID) becomes the ES doc `_id` (idempotent re-ingest); generated if omitted
+- Max 100 images per batch (override with `MAX_BATCH_SIZE` in `.env`); processed sequentially (~0.1–1s per image), so very large batches mean long-running requests — chunk client-side if you need thousands
+- First ingest after server start loads the CLIP model (~1–2s warm, ~350MB download on first ever run)
 
 ### `POST /api/search` — find similar images
 
-Body: `{ "filenames": ["img1.png", ...] }` (1–5, must be indexed). Returns top-8 ranked matches, each including `profile_id` (null for images ingested before profiles existed).
+1–5 filenames of already-indexed images; embeddings are averaged into one query. Returns top-8 matches with `profile_id` per hit (null for pre-profile images).
+
+```bash
+curl -X POST http://localhost:3000/api/search \
+  -H 'Content-Type: application/json' \
+  -d '{ "filenames": ["car1.jpeg", "car2.jpeg"] }'
+```
+
+Response:
+
+```json
+{ "results": [ { "rank": 1, "filename": "...", "score": "0.9532", "uploaded_at": "...", "profile_id": "..." } ], "missing": [] }
+```
+
+### `GET /api/profiles/:profile_id/images` — list a profile's images
+
+```bash
+curl http://localhost:3000/api/profiles/5f0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b/images
+```
+
+Response (newest first):
+
+```json
+{ "profile_id": "...", "count": 2, "images": [ { "id": "<image-uuid>", "filename": "...", "source": "...", "uploaded_at": "..." } ] }
+```
+
+### `PATCH /api/profiles/:profile_id` — reassign a profile's images
+
+Points every image of `:profile_id` at a new profile UUID. `404` if the old profile has no images.
+
+```bash
+curl -X PATCH http://localhost:3000/api/profiles/5f0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b \
+  -H 'Content-Type: application/json' \
+  -d '{ "new_profile_id": "aa0e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b" }'
+```
+
+Response:
+
+```json
+{ "old_profile_id": "...", "new_profile_id": "...", "updated": 12 }
+```
+
+### `POST /api/images/profile-lookup` — resolve image IDs to profiles
+
+Returns the owning profile UUIDs, deduplicated, plus any IDs not found.
+
+```bash
+curl -X POST http://localhost:3000/api/images/profile-lookup \
+  -H 'Content-Type: application/json' \
+  -d '{ "image_ids": ["9b2f8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b", "7c1e8a1c-2b3d-4e5f-8a9b-0c1d2e3f4a5b"] }'
+```
+
+Response:
+
+```json
+{ "profile_ids": ["<profile-uuid>"], "missing": ["<image-uuid>"] }
+```
+
+### `DELETE /api/images` — delete all indexed documents
+
+Clears every document but keeps the index + mapping (unlike `node elastic.js --delete`, which drops the index).
+
+```bash
+curl -X DELETE http://localhost:3000/api/images
+```
+
+Response:
+
+```json
+{ "deleted": 72 }
+```
 
 ### `GET /api/photos` — list the local photos directory
+
+Each file is flagged with whether it's currently indexed in ES.
+
+```bash
+curl http://localhost:3000/api/photos
+```
+
+Response:
+
+```json
+[ { "filename": "car1.jpeg", "indexed": true } ]
+```
 
 ## CLI reference
 

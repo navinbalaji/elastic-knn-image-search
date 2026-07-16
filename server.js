@@ -200,6 +200,127 @@ app.post("/api/images", async (req, res) => {
   });
 });
 
+// Delete all indexed documents (keeps the index + mapping)
+app.delete("/api/images", async (req, res) => {
+  try {
+    const exists = await client.indices.exists({ index: INDEX_NAME });
+    if (!exists) {
+      return res.json({ deleted: 0 });
+    }
+    const response = await client.deleteByQuery({
+      index: INDEX_NAME,
+      query: { match_all: {} },
+      refresh: true,
+    });
+    res.json({ deleted: response.deleted });
+  } catch (err) {
+    console.error("Delete all failed:", err.message);
+    res.status(500).json({ error: "Delete failed. Is Elasticsearch running?" });
+  }
+});
+
+// List all images attached to a profile
+app.get("/api/profiles/:profile_id/images", async (req, res) => {
+  const { profile_id } = req.params;
+  if (!UUID_RE.test(profile_id)) {
+    return res.status(400).json({ error: "profile_id must be a valid UUID" });
+  }
+
+  try {
+    const response = await client.search({
+      index: INDEX_NAME,
+      size: 10000,
+      query: { term: { profile_id } },
+      _source: ["filename", "source", "uploaded_at"],
+      sort: [{ uploaded_at: "desc" }],
+    });
+
+    const images = response.hits.hits.map((hit) => ({
+      id: hit._id,
+      filename: hit._source.filename,
+      source: hit._source.source ?? null,
+      uploaded_at: hit._source.uploaded_at,
+    }));
+
+    res.json({ profile_id, count: images.length, images });
+  } catch (err) {
+    console.error("Profile images lookup failed:", err.message);
+    res.status(500).json({ error: "Lookup failed. Is Elasticsearch running?" });
+  }
+});
+
+// Reassign all of a profile's images to a new profile UUID
+// Body: { new_profile_id: "<uuid>" }
+app.patch("/api/profiles/:profile_id", async (req, res) => {
+  const { profile_id } = req.params;
+  const { new_profile_id } = req.body;
+
+  if (!UUID_RE.test(profile_id)) {
+    return res.status(400).json({ error: "profile_id must be a valid UUID" });
+  }
+  if (!new_profile_id || !UUID_RE.test(new_profile_id)) {
+    return res.status(400).json({ error: "new_profile_id must be a valid UUID" });
+  }
+  if (profile_id === new_profile_id) {
+    return res.status(400).json({ error: "new_profile_id must differ from the current one" });
+  }
+
+  try {
+    const response = await client.updateByQuery({
+      index: INDEX_NAME,
+      query: { term: { profile_id } },
+      script: {
+        source: "ctx._source.profile_id = params.newId",
+        params: { newId: new_profile_id },
+      },
+      refresh: true,
+      conflicts: "abort",
+    });
+
+    if (response.updated === 0) {
+      return res.status(404).json({ error: `No images found for profile ${profile_id}` });
+    }
+    res.json({ old_profile_id: profile_id, new_profile_id, updated: response.updated });
+  } catch (err) {
+    console.error("Profile reassignment failed:", err.message);
+    res.status(500).json({ error: "Update failed. Is Elasticsearch running?" });
+  }
+});
+
+// Resolve image IDs → unique profile UUIDs
+// Body: { image_ids: ["<uuid>", ...] }
+app.post("/api/images/profile-lookup", async (req, res) => {
+  const { image_ids } = req.body;
+
+  if (!Array.isArray(image_ids) || image_ids.length === 0) {
+    return res.status(400).json({ error: "image_ids must be a non-empty array" });
+  }
+  const invalid = image_ids.filter((id) => typeof id !== "string" || !UUID_RE.test(id));
+  if (invalid.length > 0) {
+    return res.status(400).json({ error: "Invalid image ids (must be UUIDs)", invalid });
+  }
+
+  try {
+    const response = await client.mget({
+      index: INDEX_NAME,
+      ids: [...new Set(image_ids)],
+      _source: ["profile_id"],
+    });
+
+    const profileIds = new Set();
+    const missing = [];
+    for (const doc of response.docs) {
+      if (doc.found && doc._source.profile_id) profileIds.add(doc._source.profile_id);
+      else if (!doc.found) missing.push(doc._id);
+    }
+
+    res.json({ profile_ids: [...profileIds], missing });
+  } catch (err) {
+    console.error("Profile lookup failed:", err.message);
+    res.status(500).json({ error: "Lookup failed. Is Elasticsearch running?" });
+  }
+});
+
 // Fetch the stored embedding for a filename from Elasticsearch
 const getStoredVector = async (filename) => {
   const response = await client.search({

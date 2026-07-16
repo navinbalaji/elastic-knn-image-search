@@ -73,6 +73,7 @@ const uploadImage = async (imagePath) => {
 
   const res = await client.index({
     index: INDEX_NAME,
+    id: filename, // filename as doc ID → re-uploads overwrite instead of duplicating
     document: {
       image_vector: vector,
       filename,

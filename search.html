@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semantic Image Search</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #4a6cf7;
+      --secondary-color: #6c757d;
+      --background-color: #f8f9fa;
+      --card-color: #ffffff;
+      --border-radius: 12px;
+      --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--background-color);
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px 0 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: var(--secondary-color);
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+
+    /* Sticky action bar */
+    .action-bar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      background-color: var(--card-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      padding: 15px 25px;
+      margin-bottom: 30px;
+    }
+
+    .selection-info {
+      font-weight: 500;
+      color: var(--secondary-color);
+    }
+
+    .selection-info strong {
+      color: var(--primary-color);
+      font-weight: 700;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: #3a57d6;
+    }
+
+    .btn-primary:disabled {
+      background-color: #b9c4f9;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--secondary-color);
+      border: 1px solid #dee2e6;
+    }
+
+    .btn-secondary:hover {
+      background-color: #f1f3f5;
+    }
+
+    /* Sections */
+    .section {
+      background-color: var(--card-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      padding: 30px;
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #333;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* Photo selection grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 15px;
+    }
+
+    .photo-tile {
+      position: relative;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      cursor: pointer;
+      aspect-ratio: 1;
+      outline: 3px solid transparent;
+      outline-offset: -3px;
+      transition: outline-color 0.15s ease, transform 0.15s ease;
+      background-color: #eee;
+    }
+
+    .photo-tile:hover {
+      transform: translateY(-3px);
+    }
+
+    .photo-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-tile.selected {
+      outline-color: var(--primary-color);
+    }
+
+    .photo-tile.selected::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-color: rgba(74, 108, 247, 0.2);
+      pointer-events: none;
+    }
+
+    .photo-tile .check-badge {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background-color: var(--primary-color);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .photo-tile.selected .check-badge {
+      display: flex;
+    }
+
+    .photo-tile .tile-filename {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 15px 8px 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    /* Results */
+    #results-section {
+      display: none;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 25px;
+    }
+
+    .result-card {
+      background-color: #fff;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .result-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .result-image-container {
+      height: 200px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .result-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .result-card:hover .result-image {
+      transform: scale(1.05);
+    }
+
+    .result-rank {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: var(--primary-color);
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .result-score {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .result-info {
+      padding: 15px;
+    }
+
+    .result-filename {
+      font-weight: 600;
+      margin-bottom: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-date {
+      font-size: 0.85rem;
+      color: var(--secondary-color);
+    }
+
+    .query-thumbs {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 25px;
+    }
+
+    .query-thumbs img {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      outline: 2px solid var(--primary-color);
+      outline-offset: -2px;
+    }
+
+    .status-message {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.2rem;
+      color: var(--secondary-color);
+    }
+
+    .status-message.error {
+      color: #dc3545;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.9);
+      overflow: auto;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      position: relative;
+      max-width: 90%;
+      max-height: 90%;
+      margin: auto;
+      display: block;
+    }
+
+    .modal-image {
+      width: 100%;
+      height: auto;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .modal-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 15px;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+
+    .modal-filename {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .modal-score {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .close-modal {
+      position: absolute;
+      top: 15px;
+      right: 25px;
+      color: white;
+      font-size: 30px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    .close-modal:hover {
+      color: var(--primary-color);
+    }
+
+    @media (max-width: 768px) {
+      .photo-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+      }
+
+      .results-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .action-bar {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Semantic Image Search</h1>
+      <p class="subtitle">Select up to 5 images, then search for visual matches using CLIP embeddings</p>
+    </header>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <div class="selection-info">Selected: <strong id="selection-count">0</strong> / 5</div>
+      <div class="action-buttons">
+        <button id="clear-btn" class="btn btn-secondary">Clear</button>
+        <button id="search-btn" class="btn btn-primary" disabled>Search for match</button>
+      </div>
+    </div>
+
+    <!-- Photo selection grid -->
+    <div class="section">
+      <h2 class="section-title">Photo Dataset</h2>
+      <div id="photos-status" class="status-message">Loading photos...</div>
+      <div id="photo-grid" class="photo-grid"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section" class="section">
+      <h2 class="section-title">Similar Images</h2>
+      <div id="query-thumbs" class="query-thumbs"></div>
+      <div id="results-status" class="status-message" style="display: none;"></div>
+      <div id="results-grid" class="results-grid"></div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="image-modal" class="modal">
+    <span class="close-modal">&times;</span>
+    <div class="modal-content">
+      <img id="modal-image" class="modal-image" alt="Full size image">
+      <div class="modal-info">
+        <div id="modal-filename" class="modal-filename"></div>
+        <div id="modal-score" class="modal-score"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MAX_SELECTION = 5;
+    const selected = new Set();
+
+    const photoGrid = document.getElementById('photo-grid');
+    const photosStatus = document.getElementById('photos-status');
+    const selectionCount = document.getElementById('selection-count');
+    const searchBtn = document.getElementById('search-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const resultsSection = document.getElementById('results-section');
+    const resultsGrid = document.getElementById('results-grid');
+    const resultsStatus = document.getElementById('results-status');
+    const queryThumbs = document.getElementById('query-thumbs');
+
+    const imagePath = (filename) => `./photos/${encodeURIComponent(filename)}`;
+
+    // Retry images that fail to load (transient drops when the grid requests many files at once)
+    function attachRetry(img, filename, maxRetries = 3) {
+      let attempts = 0;
+      img.onerror = () => {
+        if (attempts++ < maxRetries) {
+          setTimeout(() => {
+            img.src = `${imagePath(filename)}?retry=${attempts}`;
+          }, 300 * attempts);
+        }
+      };
+    }
+
+    function formatDate(dateString) {
+      const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    // --- Selection ---
+    function updateActionBar() {
+      selectionCount.textContent = selected.size;
+      searchBtn.disabled = selected.size === 0;
+    }
+
+    function toggleSelection(filename, tile) {
+      if (selected.has(filename)) {
+        selected.delete(filename);
+        tile.classList.remove('selected');
+      } else {
+        if (selected.size >= MAX_SELECTION) return;
+        selected.add(filename);
+        tile.classList.add('selected');
+      }
+      updateActionBar();
+    }
+
+    clearBtn.onclick = () => {
+      selected.clear();
+      document.querySelectorAll('.photo-tile.selected').forEach(t => t.classList.remove('selected'));
+      updateActionBar();
+    };
+
+    // --- Load photo grid ---
+    fetch('/api/photos')
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load photos');
+        return r.json();
+      })
+      .then(files => {
+        photosStatus.style.display = 'none';
+        files.forEach(filename => {
+          const tile = document.createElement('div');
+          tile.className = 'photo-tile';
+          tile.innerHTML = `
+            <div class="check-badge">&#10003;</div>
+            <img src="${imagePath(filename)}" alt="${filename}" loading="lazy" decoding="async">
+            <div class="tile-filename">${filename}</div>
+          `;
+          attachRetry(tile.querySelector('img'), filename);
+          tile.onclick = () => toggleSelection(filename, tile);
+          photoGrid.appendChild(tile);
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        photosStatus.classList.add('error');
+        photosStatus.textContent = 'Error loading photos. Is the server running? (node server.js)';
+      });
+
+    // --- Search ---
+    searchBtn.onclick = async () => {
+      const filenames = [...selected];
+      searchBtn.disabled = true;
+      searchBtn.textContent = 'Searching...';
+
+      resultsSection.style.display = 'block';
+      resultsGrid.innerHTML = '';
+      queryThumbs.innerHTML = filenames
+        .map(f => `<img src="${imagePath(f)}" alt="${f}" title="${f}">`)
+        .join('');
+      resultsStatus.classList.remove('error');
+      resultsStatus.style.display = 'block';
+      resultsStatus.textContent = 'Searching for similar images...';
+
+      try {
+        const response = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Search failed');
+
+        if (data.results.length === 0) {
+          resultsStatus.textContent = 'No similar images found.';
+        } else {
+          resultsStatus.style.display = 'none';
+          renderResults(data.results);
+        }
+        if (data.missing && data.missing.length > 0) {
+          console.warn('Not indexed, skipped from query:', data.missing);
+        }
+      } catch (err) {
+        console.error(err);
+        resultsStatus.classList.add('error');
+        resultsStatus.style.display = 'block';
+        resultsStatus.textContent = err.message;
+      } finally {
+        searchBtn.disabled = selected.size === 0;
+        searchBtn.textContent = 'Search for match';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+
+    function renderResults(results) {
+      results.forEach(result => {
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        const src = imagePath(result.filename);
+        card.innerHTML = `
+          <div class="result-image-container">
+            <div class="result-rank">${result.rank}</div>
+            <div class="result-score">${result.score}</div>
+            <img class="result-image" src="${src}" alt="${result.filename}" decoding="async">
+          </div>
+          <div class="result-info">
+            <div class="result-filename">${result.filename}</div>
+            <div class="result-date">${formatDate(result.uploaded_at)}</div>
+          </div>
+        `;
+        attachRetry(card.querySelector('.result-image'), result.filename);
+        card.querySelector('.result-image-container').onclick = () =>
+          openModal(src, result.filename, result.score);
+        resultsGrid.appendChild(card);
+      });
+    }
+
+    // --- Modal ---
+    const modal = document.getElementById('image-modal');
+    const modalImg = document.getElementById('modal-image');
+    const modalFilename = document.getElementById('modal-filename');
+    const modalScore = document.getElementById('modal-score');
+
+    function openModal(imgSrc, filename, score) {
+      modal.style.display = 'flex';
+      modalImg.src = imgSrc;
+      modalFilename.textContent = filename;
+      modalScore.textContent = `Similarity score: ${score}`;
+    }
+
+    document.querySelector('.close-modal').onclick = () => { modal.style.display = 'none'; };
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.style.display === 'flex') modal.style.display = 'none';
+    });
+  </script>
+</body>
+</html>

@@ -60,30 +60,33 @@ node elastic.js --upload-all
 
 First run downloads the CLIP model (~350MB). The index (`image-search`, `dense_vector` with cosine similarity) is created automatically.
 
-## 5. Search
+## 5. Search in the browser (interactive UI)
+
+```bash
+node server.js
+```
+
+Open http://localhost:3000/search (also served at `/`):
+
+1. The page shows a grid of all images in `photos/`
+2. Click to select up to 5 images
+3. Press **Search for match** — results appear in the Similar Images section
+
+With multiple images selected, their stored embeddings are averaged (L2-normalized) into a single kNN query. Selected images are excluded from results. Images must be indexed first (step 4) — the search uses vectors stored in ES, not live CLIP inference.
+
+## 6. Search from the CLI (alternative)
 
 ```bash
 node elastic.js --search photos/<image>.jpg
 ```
 
-Prints the top-8 matches and writes `search_results.json` + `search_image.json`.
-
-## 6. View results in the browser
-
-The results page fetches JSON files, so it must be served over HTTP (not opened via `file://`):
-
-```bash
-npx serve .
-```
-
-Open http://localhost:3000/output.html.
-
-> Fix applied: `getImagePath()` in `output.html` was hardcoded to `./testdata/Test/` — it now resolves images from `./photos/`.
+Prints the top-8 matches and writes `search_results.json` + `search_image.json`. Works with images that aren't indexed (runs CLIP locally on the query image). View the results at http://localhost:3000/output.
 
 ## CLI reference
 
 | Command | Description |
 |---|---|
+| `node server.js` | Start the web UI (http://localhost:3000/search) |
 | `node elastic.js --upload <path>` | Index a single image |
 | `node elastic.js --upload-all` | Index all images in `IMAGE_DIRECTORY` |
 | `node elastic.js --search <path>` | Find similar images |
@@ -93,5 +96,6 @@ Open http://localhost:3000/output.html.
 
 - **`Unsupported pipeline: image-feature-extraction`** — stale install; run `npm install` (needs `@xenova/transformers` 2.17.2+)
 - **Connection refused on 9200** — ES container not running: `docker start es-knn`
-- **Broken thumbnails in output.html** — page opened via `file://` or images not in `photos/`; serve with `npx serve .`
+- **Broken thumbnails in output.html** — page opened via `file://` or images not in `photos/`; serve with `node server.js`
+- **"None of the selected images are indexed"** — run `node elastic.js --upload-all` first; the UI searches with stored vectors
 - **Searching an indexed image returns itself at ~1.0** — expected; test with an image not in the index for a more meaningful demo
